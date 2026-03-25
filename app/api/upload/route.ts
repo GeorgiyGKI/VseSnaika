@@ -1,4 +1,4 @@
-import { handleUpload } from "@vercel/blob";
+import { handleUpload } from "@vercel/blob/client";
 import { NextResponse } from "next/server";
 
 import { ACCEPTED_IMAGE_TYPES, ACCEPTED_PDF_TYPES } from "@/lib/constants";
