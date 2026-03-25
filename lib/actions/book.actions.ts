@@ -1,80 +1,233 @@
-type BookRecord = {
-  _id: string;
-  clerkId: string;
-  title: string;
-  slug: string;
-  author: string;
-  persona?: string;
-  fileURL: string;
-  fileBlobKey: string;
-  coverURL?: string;
-  coverBlobKey?: string;
-  fileSize: number;
-  totalSegments: number;
-};
+'use server';
 
-const BOOKS_KEY = "bookified:books";
+import {CreateBook, TextSegment} from "@/types";
+import {connectToDatabase} from "@/database/mongoose";
+import {escapeRegex, generateSlug, serializeData} from "@/lib/utils";
+import Book from "@/database/models/book.model";
+import BookSegment from "@/database/models/book-segment.model";
+import mongoose from "mongoose";
+// import {getUserPlan} from "@/lib/subscription.server";
 
-const readBooks = (): BookRecord[] => {
-  if (typeof window === "undefined") return [];
-  const raw = window.localStorage.getItem(BOOKS_KEY);
-  if (!raw) return [];
+export const getAllBooks = async (search?: string) => {
   try {
-    return JSON.parse(raw) as BookRecord[];
-  } catch {
-    return [];
+    await connectToDatabase();
+
+    let query = {};
+
+    if (search) {
+      const escapedSearch = escapeRegex(search);
+      const regex = new RegExp(escapedSearch, 'i');
+      query = {
+        $or: [
+          { title: { $regex: regex } },
+          { author: { $regex: regex } },
+        ]
+      };
+    }
+
+    const books = await Book.find(query).sort({ createdAt: -1 }).lean();
+
+    return {
+      success: true,
+      data: serializeData(books)
+    }
+  } catch (e) {
+    console.error('Error connecting to database', e);
+    return {
+      success: false, error: e
+    }
   }
-};
-
-const writeBooks = (books: BookRecord[]) => {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(BOOKS_KEY, JSON.stringify(books));
-};
-
-const slugify = (value: string) =>
-  value
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9\u0400-\u04ff\s-]/g, "")
-    .replace(/\s+/g, "-")
-    .replace(/-+/g, "-");
+}
 
 export const checkBookExists = async (title: string) => {
-  const books = readBooks();
-  const slug = slugify(title);
-  const book = books.find((item) => item.slug === slug);
-  return { exists: Boolean(book), book };
-};
+  try {
+    await connectToDatabase();
 
-export const createBook = async (
-  payload: Omit<BookRecord, "_id" | "slug" | "totalSegments">
-) => {
-  const books = readBooks();
-  const slug = slugify(payload.title);
-  const existing = books.find((item) => item.slug === slug);
+    const slug = generateSlug(title);
 
-  if (existing) {
-    return { success: true, alreadyExists: true, data: existing };
+    const existingBook = await Book.findOne({slug}).lean();
+
+    if(existingBook) {
+      return {
+        exists: true,
+        book: serializeData(existingBook)
+      }
+    }
+
+    return {
+      exists: false,
+    }
+  } catch (e) {
+    console.error('Error checking book exists', e);
+    return {
+      exists: false, error: e
+    }
   }
+}
 
-  const book: BookRecord = {
-    _id: crypto.randomUUID(),
-    slug,
-    totalSegments: 0,
-    ...payload,
-  };
+export const createBook = async (data: CreateBook) => {
+  try {
+    await connectToDatabase();
 
-  books.push(book);
-  writeBooks(books);
+    const slug = generateSlug(data.title);
 
-  return { success: true, data: book };
-};
+    const existingBook = await Book.findOne({slug}).lean();
 
-export const saveBookSegments = async (bookId: string, userId: string, segments: string[]) => {
-  if (typeof window === "undefined") {
-    return { success: false, error: "Storage unavailable" };
+    if(existingBook) {
+      return {
+        success: true,
+        data: serializeData(existingBook),
+        alreadyExists: true,
+      }
+    }
+
+    // Todo: Check subscription limits before creating a book
+    // const { getUserPlan } = await import("@/lib/subscription.server");
+    // const { PLAN_LIMITS } = await import("@/lib/subscription-constants");
+
+    const { auth } = await import("@clerk/nextjs/server");
+    const { userId } = await auth();
+
+    if (!userId || userId !== data.clerkId) {
+      return { success: false, error: "Unauthorized" };
+    }
+
+    // const plan = await getUserPlan();
+    // const limits = PLAN_LIMITS[plan];
+
+    const bookCount = await Book.countDocuments({ clerkId: userId });
+
+    // if (bookCount >= limits.maxBooks) {
+    //   const { revalidatePath } = await import("next/cache");
+    //   revalidatePath("/");
+    //
+    //   return {
+    //     success: false,
+    //     error: `You have reached the maximum number of books allowed for your ${plan} plan (${limits.maxBooks}). Please upgrade to add more books.`,
+    //     isBillingError: true,
+    //   };
+    // }
+
+    const book = await Book.create({...data, clerkId: userId, slug, totalSegments: 0});
+
+    return {
+      success: true,
+      data: serializeData(book),
+    }
+  } catch (e) {
+    console.error('Error creating a book', e);
+
+    return {
+      success: false,
+      error: e,
+    }
   }
-  const key = `bookified:segments:${bookId}:${userId}`;
-  window.localStorage.setItem(key, JSON.stringify(segments));
-  return { success: true };
+}
+
+export const getBookBySlug = async (slug: string) => {
+  try {
+    await connectToDatabase();
+
+    const book = await Book.findOne({ slug }).lean();
+
+    if (!book) {
+      return { success: false, error: 'Book not found' };
+    }
+
+    return {
+      success: true,
+      data: serializeData(book)
+    }
+  } catch (e) {
+    console.error('Error fetching book by slug', e);
+    return {
+      success: false, error: e
+    }
+  }
+}
+
+export const saveBookSegments = async (bookId: string, clerkId: string, segments: TextSegment[]) => {
+  try {
+    await connectToDatabase();
+
+    console.log('Saving book segments...');
+
+    const segmentsToInsert = segments.map(({ text, segmentIndex, pageNumber, wordCount }) => ({
+      clerkId, bookId, content: text, segmentIndex, pageNumber, wordCount
+    }));
+
+    await BookSegment.insertMany(segmentsToInsert);
+
+    await Book.findByIdAndUpdate(bookId, { totalSegments: segments.length });
+
+    console.log('Book segments saved successfully.');
+
+    return {
+      success: true,
+      data: { segmentsCreated: segments.length}
+    }
+  } catch (e) {
+    console.error('Error saving book segments', e);
+
+    return {
+      success: false,
+      error: e,
+    }
+  }
+}
+
+// Searches book segments using MongoDB text search with regex fallback
+export const searchBookSegments = async (bookId: string, query: string, limit: number = 5) => {
+  try {
+    await connectToDatabase();
+
+    console.log(`Searching for: "${query}" in book ${bookId}`);
+
+    const bookObjectId = new mongoose.Types.ObjectId(bookId);
+
+    // Try MongoDB text search first (requires text index)
+    let segments: Record<string, unknown>[] = [];
+    try {
+      segments = await BookSegment.find({
+        bookId: bookObjectId,
+        $text: { $search: query },
+      })
+          .select('_id bookId content segmentIndex pageNumber wordCount')
+          .sort({ score: { $meta: 'textScore' } })
+          .limit(limit)
+          .lean();
+    } catch {
+      // Text index may not exist — fall through to regex fallback
+      segments = [];
+    }
+
+    // Fallback: regex search matching ANY keyword
+    if (segments.length === 0) {
+      const keywords = query.split(/\s+/).filter((k) => k.length > 2);
+      const pattern = keywords.map(escapeRegex).join('|');
+
+      segments = await BookSegment.find({
+        bookId: bookObjectId,
+        content: { $regex: pattern, $options: 'i' },
+      })
+          .select('_id bookId content segmentIndex pageNumber wordCount')
+          .sort({ segmentIndex: 1 })
+          .limit(limit)
+          .lean();
+    }
+
+    console.log(`Search complete. Found ${segments.length} results`);
+
+    return {
+      success: true,
+      data: serializeData(segments),
+    };
+  } catch (error) {
+    console.error('Error searching segments:', error);
+    return {
+      success: false,
+      error: (error as Error).message,
+      data: [],
+    };
+  }
 };

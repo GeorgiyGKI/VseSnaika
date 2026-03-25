@@ -13,7 +13,7 @@ import { ACCEPTED_PDF_TYPES, ACCEPTED_IMAGE_TYPES, DEFAULT_VOICE } from '@/lib/c
 import FileUploader from './FileUploader';
 import VoiceSelector from './VoiceSelector';
 import LoadingOverlay from './LoadingOverlay';
-import { useAuth } from "@clerk/nextjs";
+import {useAuth, useUser} from "@clerk/nextjs";
 import { toast } from 'sonner';
 import {checkBookExists, createBook, saveBookSegments} from "@/lib/actions/book.actions";
 import {useRouter} from "next/navigation";
@@ -35,7 +35,7 @@ const UploadForm = () => {
         defaultValues: {
             title: '',
             author: '',
-            persona: DEFAULT_VOICE,
+            persona: '',
             pdfFile: undefined,
             coverImage: undefined,
         },
@@ -110,11 +110,11 @@ const UploadForm = () => {
             });
 
             if(!book.success) {
-               /* toast.error(book.error as string || "Failed to create book");
-                if (book.isBillingError) {
-                    router.push("/subscriptions");
-                }
-                return;*/
+                toast.error(book.error as string || "Failed to create book");
+                // if (book.isBillingError) {
+                //     router.push("/subscriptions");
+                // }
+                return;
             }
 
             if(book.alreadyExists) {
@@ -155,11 +155,11 @@ const UploadForm = () => {
                         <FileUploader
                             control={form.control}
                             name="pdfFile"
-                            label="PDF-файл книги"
+                            label="Book PDF File"
                             acceptTypes={ACCEPTED_PDF_TYPES}
                             icon={Upload}
-                            placeholder="Нажмите, чтобы загрузить PDF"
-                            hint="PDF-файл (до 50 МБ)"
+                            placeholder="Click to upload PDF"
+                            hint="PDF file (max 50MB)"
                             disabled={isSubmitting}
                         />
 
@@ -167,11 +167,11 @@ const UploadForm = () => {
                         <FileUploader
                             control={form.control}
                             name="coverImage"
-                            label="Обложка (необязательно)"
+                            label="Cover Image (Optional)"
                             acceptTypes={ACCEPTED_IMAGE_TYPES}
                             icon={ImageIcon}
-                            placeholder="Нажмите, чтобы загрузить обложку"
-                            hint="Оставьте пустым для авто‑генерации из PDF"
+                            placeholder="Click to upload cover image"
+                            hint="Leave empty to auto-generate from PDF"
                             disabled={isSubmitting}
                         />
 
@@ -181,11 +181,11 @@ const UploadForm = () => {
                             name="title"
                             render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel className="form-label">Название</FormLabel>
+                                    <FormLabel className="form-label">Title</FormLabel>
                                     <FormControl>
                                         <Input
                                             className="form-input"
-                                            placeholder="например: Богатый папа, бедный папа"
+                                            placeholder="ex: Rich Dad Poor Dad"
                                             {...field}
                                             disabled={isSubmitting}
                                         />
@@ -201,11 +201,11 @@ const UploadForm = () => {
                             name="author"
                             render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel className="form-label">Автор</FormLabel>
+                                    <FormLabel className="form-label">Author Name</FormLabel>
                                     <FormControl>
                                         <Input
                                             className="form-input"
-                                            placeholder="например: Роберт Кийосаки"
+                                            placeholder="ex: Robert Kiyosaki"
                                             {...field}
                                             disabled={isSubmitting}
                                         />
@@ -221,7 +221,7 @@ const UploadForm = () => {
                             name="persona"
                             render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel className="form-label">Выберите голос ассистента</FormLabel>
+                                    <FormLabel className="form-label">Choose Assistant Voice</FormLabel>
                                     <FormControl>
                                         <VoiceSelector
                                             value={field.value}
@@ -236,7 +236,7 @@ const UploadForm = () => {
 
                         {/* 6. Submit Button */}
                         <Button type="submit" className="form-btn" disabled={isSubmitting}>
-                            Начать обработку
+                            Begin Synthesis
                         </Button>
                     </form>
                 </Form>
