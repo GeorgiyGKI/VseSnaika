@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import {usePathname} from "next/navigation";
-import {Show, SignInButton, SignUpButton, UserButton, useUser } from "@clerk/nextjs";
+import {Show, SignInButton, UserButton, useUser } from "@clerk/nextjs";
 import {cn} from "@/lib/utils";
 
 const navItems = [
@@ -38,7 +38,6 @@ const Navbar = () => {
                     <div className="flex gap-7 items-center">
                         <Show when="signed-out">
                             <SignInButton mode="modal">Логин</SignInButton>
-                            <SignUpButton  mode="modal">Регистрация</SignUpButton>
                         </Show>
                         <Show when="signed-in" >
                             <div className="nav-user-link">

@@ -1,9 +1,9 @@
 'use client';
 
 import React, {useEffect, useState} from 'react';
-// import {Input} from "@/components/ui/input";
 import {Search as SearchIcon} from "lucide-react";
 import {usePathname, useRouter, useSearchParams} from "next/navigation";
+import {Input} from "@/components/ui/input";
 
 const Search = () => {
     const searchParams = useSearchParams();
@@ -36,13 +36,13 @@ const Search = () => {
                     className="text-[var(--text-muted)]"
                 />
             </div>
-            {/*<Input
+            <Input
                 type="text"
-                placeholder="Search books by title or author"
+                placeholder="Поиск книг по заголовку или автору"
                 className="library-search-input border-none shadow-none focus-visible:ring-0"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-            />*/}
+            />
         </div>
     );
 };

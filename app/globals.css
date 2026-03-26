@@ -543,10 +543,10 @@
     @apply font-normal text-sm text-[#222c37] leading-5;
   }
   .library-search-wrapper {
-    @apply flex items-center bg-white border border-[var(--border-subtle)] rounded-lg overflow-hidden w-full sm:w-80;
+    @apply flex items-center bg-white border border-[var(--border-subtle)] rounded-lg overflow-hidden w-full sm:w-85;
   }
   .library-search-input {
-    @apply flex-1 py-2 px-4 outline-none text-[var(--text-primary)] placeholder:text-[var(--text-muted)];
+    @apply flex-1 py-3 px-4 outline-none text-[var(--text-primary)] placeholder:text-[var(--text-muted)];
   }
   .library-books-grid {
     @apply grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-x-3 md:gap-x-10 gap-y-7 md:gap-y-9;
