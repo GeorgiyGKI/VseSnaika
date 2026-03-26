@@ -144,7 +144,7 @@ export const getBookBySlug = async (slug: string) => {
     const book = await Book.findOne({ slug: { $in: candidateSlugs } }).lean();
 
     if (!book) {
-      return { success: false, error: 'Book not found' };
+      return { success: false, error: 'Книга не найдена' };
     }
 
     return {

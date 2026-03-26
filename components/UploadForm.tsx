@@ -47,6 +47,7 @@ const UploadForm = () => {
         }
 
         setIsSubmitting(true);
+        let shouldSuppressGenericErrorToast = false;
 
         // PostHog -> Track Book Uploads...
 
@@ -131,6 +132,7 @@ const UploadForm = () => {
             const segments = await saveBookSegments(book.data._id, userId, parsedPDF.content);
 
             if(!segments.success) {
+                shouldSuppressGenericErrorToast = true;
                 toast.error("Не удалось сохранить сегменты книги");
                 throw new Error("Не удалось сохранить сегменты книги");
             }
@@ -139,6 +141,9 @@ const UploadForm = () => {
             router.push('/');
         } catch (error) {
             console.error(error);
+            if (shouldSuppressGenericErrorToast) {
+                return;
+            }
 
             toast.error("Не удалось загрузить книгу. Пожалуйста, попробуйте позже.");
         } finally {
@@ -162,7 +167,7 @@ const UploadForm = () => {
                             label="Книга PDF-файл"
                             acceptTypes={ACCEPTED_PDF_TYPES}
                             icon={Upload}
-                            placeholder="Нжмите, чтобы загрузить PDF-файл"
+                            placeholder="Нажмите, чтобы загрузить PDF-файл"
                             hint="PDF файл (максимум 50MB)"
                             disabled={isSubmitting}
                         />

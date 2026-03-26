@@ -100,6 +100,7 @@ const normalizeExtractedText = (text: string): string =>
 
 const shouldUseOcrFallback = (text: string): boolean => {
   const sample = text.trim();
+  if (sample.length === 0) return true;
   if (sample.length < 80) return false;
 
   const cyrillicCount = countMatches(sample, /\p{Script=Cyrillic}/gu);
@@ -112,7 +113,9 @@ const shouldUseOcrFallback = (text: string): boolean => {
 
   const mostlyLatin = latinCount > cyrillicCount * 2 && latinCount > 40;
   const noisyMixedWords = mixedWords >= 5;
-  const suspiciousDigits = digitCount > 0 && digitCount > Math.floor(cyrillicCount / 8);
+  const suspiciousDigits = cyrillicCount > 0
+      ? digitCount > Math.floor(cyrillicCount / 8)
+      : digitCount > 10;
 
   return mostlyLatin && (noisyMixedWords || suspiciousDigits);
 };
@@ -142,6 +145,7 @@ const renderPageToCanvas = async (
 };
 
 export async function parsePDFFile(file: File) {
+  let pdfDocument;
   let ocrWorker:
       | {
           recognize: (image: HTMLCanvasElement) => Promise<{ data: { text: string } }>;
@@ -164,7 +168,6 @@ export async function parsePDFFile(file: File) {
     const arrayBuffer = await file.arrayBuffer();
 
     // Load PDF document (try with cMaps/fonts first for better extraction).
-    let pdfDocument;
     try {
       const loadingTask = pdfjsLib.getDocument({
         data: arrayBuffer,
@@ -216,12 +219,6 @@ export async function parsePDFFile(file: File) {
     // Split text into segments for search
     const segments = splitIntoSegments(fullText);
 
-    await pdfDocument.destroy();
-    if (ocrWorker) {
-      await ocrWorker.terminate();
-      ocrWorker = null;
-    }
-
     return {
       content: segments,
       cover: coverDataURL,
@@ -230,8 +227,12 @@ export async function parsePDFFile(file: File) {
     console.error('Error parsing PDF:', error);
     throw new Error(`Failed to parse PDF file: ${error instanceof Error ? error.message : String(error)}`);
   } finally {
+    if (pdfDocument) {
+      await pdfDocument.destroy();
+    }
     if (ocrWorker) {
       await ocrWorker.terminate();
+      ocrWorker = null;
     }
   }
 }
