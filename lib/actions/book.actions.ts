@@ -93,7 +93,7 @@ export const createBook = async (data: CreateBook) => {
     const { userId } = await auth();
 
     if (!userId || userId !== data.clerkId) {
-      return { success: false, error: "Unauthorized" };
+      return { success: false, error: "Нет доступа" };
     }
 
     const plan = await getUserPlan();
@@ -107,7 +107,7 @@ export const createBook = async (data: CreateBook) => {
 
       return {
         success: false,
-        error: `You have reached the maximum number of books allowed for your ${plan} plan (${limits.maxBooks}). Please upgrade to add more books.`,
+        error: `Вы достигли максимального количества книг для тарифа ${plan} (${limits.maxBooks}). Обновите тариф, чтобы добавить больше книг.`,
         isBillingError: true,
       };
     }
@@ -123,7 +123,7 @@ export const createBook = async (data: CreateBook) => {
 
     return {
       success: false,
-      error: e instanceof Error ? e.message : 'Failed to create book',
+      error: e instanceof Error ? e.message : 'Не удалось создать книгу',
     }
   }
 }
@@ -132,7 +132,16 @@ export const getBookBySlug = async (slug: string) => {
   try {
     await connectToDatabase();
 
-    const book = await Book.findOne({ slug }).lean();
+    let decodedSlug = slug;
+    try {
+      decodedSlug = decodeURIComponent(slug);
+    } catch {
+      decodedSlug = slug;
+    }
+
+    const candidateSlugs = Array.from(new Set([slug, decodedSlug]));
+
+    const book = await Book.findOne({ slug: { $in: candidateSlugs } }).lean();
 
     if (!book) {
       return { success: false, error: 'Book not found' };
@@ -176,7 +185,7 @@ export const saveBookSegments = async (bookId: string, clerkId: string, segments
 
     return {
       success: false,
-      error: e instanceof Error ? e.message : 'Failed to save book segments',
+      error: e instanceof Error ? e.message : 'Не удалось сохранить сегменты книги',
     }
   }
 }

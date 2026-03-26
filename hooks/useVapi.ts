@@ -85,9 +85,9 @@ export function useVapi(book: IBook) {
                         if (newDuration >= maxDurationRef.current) {
                             getVapi().stop();
                             setLimitError(
-                                `Session time limit (${Math.floor(
+                                `Достигнут лимит времени сессии (${Math.floor(
                                     maxDurationRef.current / SECONDS_PER_MINUTE,
-                                )} minutes) reached. Upgrade your plan for longer sessions.`,
+                                )} минут). Обновите тариф для более длительных сессий.`,
                             );
                         }
                     }
@@ -195,11 +195,11 @@ export function useVapi(book: IBook) {
                 // Show user-friendly error message
                 const errorMessage = error.message?.toLowerCase() || '';
                 if (errorMessage.includes('timeout') || errorMessage.includes('silence')) {
-                    setLimitError('Session ended due to inactivity. Click the mic to start again.');
+                    setLimitError('Сессия завершена из-за неактивности. Нажмите на микрофон, чтобы начать снова.');
                 } else if (errorMessage.includes('network') || errorMessage.includes('connection')) {
-                    setLimitError('Connection lost. Please check your internet and try again.');
+                    setLimitError('Соединение потеряно. Проверьте интернет и попробуйте снова.');
                 } else {
-                    setLimitError('Session ended unexpectedly. Click the mic to start again.');
+                    setLimitError('Сессия завершилась неожиданно. Нажмите на микрофон, чтобы начать снова.');
                 }
 
                 startTimeRef.current = null;
@@ -230,7 +230,7 @@ export function useVapi(book: IBook) {
 
     const start = useCallback(async () => {
         if (!userId) {
-            setLimitError('Please sign in to start a voice session.');
+            setLimitError('Пожалуйста, войдите в аккаунт, чтобы начать голосовую сессию.');
             return;
         }
 
@@ -243,7 +243,11 @@ export function useVapi(book: IBook) {
             const result = await startVoiceSession(userId, book._id);
 
             if (!result.success) {
-                setLimitError(result.error || 'Session limit reached. Please upgrade your plan.');
+                setLimitError(
+                    result.isBillingError
+                        ? 'Достигнут лимит сессий по вашему тарифу. Пожалуйста, обновите тариф.'
+                        : 'Не удалось начать голосовую сессию. Пожалуйста, попробуйте снова.',
+                );
                 setIsBillingError(!!result.isBillingError);
                 setStatus('idle');
                 return;
@@ -275,7 +279,7 @@ export function useVapi(book: IBook) {
         } catch (err) {
             console.error('Failed to start call:', err);
             setStatus('idle');
-            setLimitError('Failed to start voice session. Please try again.');
+            setLimitError('Не удалось начать голосовую сессию. Пожалуйста, попробуйте снова.');
         }
     }, [book._id, book.title, book.author, voice, userId]);
 

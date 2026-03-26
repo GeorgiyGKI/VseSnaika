@@ -28,7 +28,7 @@ export const startVoiceSession = async (clerkId: string, bookId: string): Promis
 
             return {
                 success: false,
-                error: `You have reached the monthly session limit for your ${plan} plan (${limits.maxSessionsPerMonth}). Please upgrade for more sessions.`,
+                error: `Вы достигли месячного лимита сессий для тарифа ${plan} (${limits.maxSessionsPerMonth}). Обновите тариф для большего количества сессий.`,
                 isBillingError: true,
             };
         }
@@ -48,7 +48,7 @@ export const startVoiceSession = async (clerkId: string, bookId: string): Promis
         }
     } catch (e) {
         console.error('Error starting voice session', e);
-        return { success: false, error: 'Failed to start voice session. Please try again later.' }
+        return { success: false, error: 'Не удалось начать голосовую сессию. Пожалуйста, попробуйте позже.' }
     }
 }
 
@@ -61,12 +61,12 @@ export const endVoiceSession = async (sessionId: string, durationSeconds: number
             durationSeconds,
         });
 
-        if(!result) return { success: false, error: 'Voice session not found.' }
+        if(!result) return { success: false, error: 'Голосовая сессия не найдена.' }
 
         return { success: true }
     } catch (e) {
         console.error('Error ending voice session', e);
-        return { success: false, error: 'Failed to end voice session. Please try again later.' }
+        return { success: false, error: 'Не удалось завершить голосовую сессию. Пожалуйста, попробуйте позже.' }
     }
 }
 
