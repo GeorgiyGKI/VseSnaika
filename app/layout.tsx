@@ -32,16 +32,17 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
+      <ClerkProvider localization={ruRU}>
         <html lang="en">
         <body
             className={`${ibmPlexSerif.variable} ${monaSans.variable} relative font-sans antialiased`}
         >
-        <ClerkProvider localization={ruRU}>
           <Navbar />
           {children}
           <Toaster richColors position="top-right" />
-        </ClerkProvider>
+
         </body>
         </html>
+      </ClerkProvider>
   );
 }
