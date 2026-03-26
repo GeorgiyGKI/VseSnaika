@@ -6,7 +6,9 @@ import {escapeRegex, generateSlug, serializeData} from "@/lib/utils";
 import Book from "@/database/models/book.model";
 import BookSegment from "@/database/models/book-segment.model";
 import mongoose from "mongoose";
-// import {getUserPlan} from "@/lib/subscription.server";
+import {getUserPlan} from "@/lib/subscription.server";
+import {PLAN_LIMITS} from "@/lib/subscription-constants";
+
 
 export const getAllBooks = async (search?: string) => {
   try {
@@ -94,21 +96,21 @@ export const createBook = async (data: CreateBook) => {
       return { success: false, error: "Unauthorized" };
     }
 
-    // const plan = await getUserPlan();
-    // const limits = PLAN_LIMITS[plan];
+    const plan = await getUserPlan();
+    const limits = PLAN_LIMITS[plan];
 
-    //const bookCount = await Book.countDocuments({ clerkId: userId });
+    const bookCount = await Book.countDocuments({ clerkId: userId });
 
-    // if (bookCount >= limits.maxBooks) {
-    //   const { revalidatePath } = await import("next/cache");
-    //   revalidatePath("/");
-    //
-    //   return {
-    //     success: false,
-    //     error: `You have reached the maximum number of books allowed for your ${plan} plan (${limits.maxBooks}). Please upgrade to add more books.`,
-    //     isBillingError: true,
-    //   };
-    // }
+    if (bookCount >= limits.maxBooks) {
+      const { revalidatePath } = await import("next/cache");
+      revalidatePath("/");
+
+      return {
+        success: false,
+        error: `You have reached the maximum number of books allowed for your ${plan} plan (${limits.maxBooks}). Please upgrade to add more books.`,
+        isBillingError: true,
+      };
+    }
 
     const book = await Book.create({...data, clerkId: userId, slug, totalSegments: 0});
 

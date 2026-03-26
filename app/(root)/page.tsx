@@ -7,17 +7,15 @@ import {auth} from "@clerk/nextjs/server";
 
 const Page = async ({ searchParams }: { searchParams: Promise<{ query?: string }> }) => {
     const { query } = await searchParams;
-    const { userId } = await auth();
-
     const bookResults = await getAllBooks(query)
     const books = bookResults.success ? bookResults.data ?? [] : []
 
     return (
-        <main className="wrapper container" data-signed-in={Boolean(userId)}>
+        <main className="wrapper container">
             <HeroSection />
 
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-5 mb-10">
-                <h2 className="text-3xl font-serif font-bold text-[#212a3b]">Recent Books</h2>
+                <h2 className="text-3xl font-serif font-bold text-[#212a3b]">Последние Книги</h2>
                 <Search />
             </div>
 
