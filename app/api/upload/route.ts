@@ -1,22 +1,45 @@
-import { handleUpload } from "@vercel/blob/client";
-import { NextResponse } from "next/server";
+import {NextResponse} from "next/server";
+import {handleUpload, HandleUploadBody} from "@vercel/blob/client";
+import {auth} from "@clerk/nextjs/server";
+import {MAX_FILE_SIZE} from "@/lib/constants";
 
-import { ACCEPTED_IMAGE_TYPES, ACCEPTED_PDF_TYPES } from "@/lib/constants";
+export async function POST(request: Request): Promise<NextResponse> {
+  try {
+    const { userId } = await auth();
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
-export async function POST(request: Request) {
-  const body = await request.json();
+    const body = (await request.json()) as HandleUploadBody;
 
-  const response = await handleUpload({
-    body,
-    request,
-    onBeforeGenerateToken: async () => {
-      return {
-        allowedContentTypes: [...ACCEPTED_PDF_TYPES, ...ACCEPTED_IMAGE_TYPES],
-        tokenPayload: JSON.stringify({}),
-      };
-    },
-    onUploadCompleted: async () => {},
-  });
+    const jsonResponse = await handleUpload({
+      token: process.env.BLOB_READ_WRITE_TOKEN,
+      body,
+      request,
+      onBeforeGenerateToken: async () => {
+        return {
+          allowedContentTypes: ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'],
+          addRandomSuffix: true,
+          maximumSizeInBytes: MAX_FILE_SIZE,
+          tokenPayload: JSON.stringify({ userId })
+        }
+      } ,
+      onUploadCompleted: async ({ blob, tokenPayload }) => {
+        console.log('File uploaded to blob: ', blob.url)
 
-  return NextResponse.json(response);
+        const payload = tokenPayload ? JSON.parse(tokenPayload): null
+        const userId = payload?.userId;
+
+        // TODO: PostHog
+      }
+    });
+
+    return NextResponse.json(jsonResponse)
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "An unknown error occurred";
+    const status = message.includes('Unauthorized') ? 401 : 500;
+    console.error('Upload error', e);
+    const clientMessage = status === 401 ? 'Unauthorized' : 'Upload failed';
+    return NextResponse.json({ error: clientMessage }, { status });
+  }
 }
