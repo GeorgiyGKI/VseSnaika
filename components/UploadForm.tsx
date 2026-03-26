@@ -43,10 +43,11 @@ const UploadForm = () => {
 
     const onSubmit = async (data: BookUploadFormValues) => {
         if(!userId) {
-            return toast.error("Please login to upload books");
+            return toast.error("Пожалуйста, войдите в аккаунт, чтобы загружать книги");
         }
 
         setIsSubmitting(true);
+        let shouldSuppressGenericErrorToast = false;
 
         // PostHog -> Track Book Uploads...
 
@@ -54,9 +55,9 @@ const UploadForm = () => {
             const existsCheck = await checkBookExists(data.title);
 
             if(existsCheck.exists && existsCheck.book) {
-                toast.info("Book with same title already exists.");
+                toast.info("Книга с таким же названием уже существует");
                 form.reset()
-                router.push(`/books/${existsCheck.book.slug}`)
+                router.push(`/books/${encodeURIComponent(existsCheck.book.slug)}`)
                 return;
             }
 
@@ -66,7 +67,7 @@ const UploadForm = () => {
             const parsedPDF = await parsePDFFile(pdfFile);
 
             if(parsedPDF.content.length === 0) {
-                toast.error("Failed to parse PDF. Please try again with a different file.");
+                toast.error("Не удалось разобрать PDF-файл. Пожалуйста, повторите попытку с другим файлом.");
                 return;
             }
 
@@ -110,7 +111,11 @@ const UploadForm = () => {
             });
 
             if(!book.success) {
-                toast.error(book.error as string || "Failed to create book");
+                toast.error(
+                    book.isBillingError
+                        ? "Достигнут лимит книг по вашему тарифу. Обновите тариф, чтобы добавить больше книг."
+                        : "Не удалось создать книгу",
+                );
                 if (book.isBillingError) {
                     router.push("/subscriptions");
                 }
@@ -118,25 +123,29 @@ const UploadForm = () => {
             }
 
             if(book.alreadyExists) {
-                toast.info("Book with same title already exists.");
+                toast.info("Книга с таким же названием уже существует");
                 form.reset()
-                router.push(`/books/${book.data.slug}`)
+                router.push(`/books/${encodeURIComponent(book.data.slug)}`)
                 return;
             }
 
             const segments = await saveBookSegments(book.data._id, userId, parsedPDF.content);
 
             if(!segments.success) {
-                toast.error("Failed to save book segments");
-                throw new Error("Failed to save book segments");
+                shouldSuppressGenericErrorToast = true;
+                toast.error("Не удалось сохранить сегменты книги");
+                throw new Error("Не удалось сохранить сегменты книги");
             }
 
             form.reset();
             router.push('/');
         } catch (error) {
             console.error(error);
+            if (shouldSuppressGenericErrorToast) {
+                return;
+            }
 
-            toast.error("Failed to upload book. Please try again later.");
+            toast.error("Не удалось загрузить книгу. Пожалуйста, попробуйте позже.");
         } finally {
             setIsSubmitting(false);
         }
@@ -155,11 +164,11 @@ const UploadForm = () => {
                         <FileUploader
                             control={form.control}
                             name="pdfFile"
-                            label="Book PDF File"
+                            label="Книга PDF-файл"
                             acceptTypes={ACCEPTED_PDF_TYPES}
                             icon={Upload}
-                            placeholder="Click to upload PDF"
-                            hint="PDF file (max 50MB)"
+                            placeholder="Нажмите, чтобы загрузить PDF-файл"
+                            hint="PDF файл (максимум 50MB)"
                             disabled={isSubmitting}
                         />
 
@@ -167,11 +176,11 @@ const UploadForm = () => {
                         <FileUploader
                             control={form.control}
                             name="coverImage"
-                            label="Cover Image (Optional)"
+                            label="Обложка (опционально)"
                             acceptTypes={ACCEPTED_IMAGE_TYPES}
                             icon={ImageIcon}
-                            placeholder="Click to upload cover image"
-                            hint="Leave empty to auto-generate from PDF"
+                            placeholder="Нажмите, чтобы загрузить обложку"
+                            hint="Оставьте пустым для автоматической генерации из PDF"
                             disabled={isSubmitting}
                         />
 
@@ -181,11 +190,11 @@ const UploadForm = () => {
                             name="title"
                             render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel className="form-label">Title</FormLabel>
+                                    <FormLabel className="form-label">Заголовок</FormLabel>
                                     <FormControl>
                                         <Input
                                             className="form-input"
-                                            placeholder="ex: Rich Dad Poor Dad"
+                                            placeholder="пример: Богатый папа, бедный папа"
                                             {...field}
                                             disabled={isSubmitting}
                                         />
@@ -201,11 +210,11 @@ const UploadForm = () => {
                             name="author"
                             render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel className="form-label">Author Name</FormLabel>
+                                    <FormLabel className="form-label">Имя автора</FormLabel>
                                     <FormControl>
                                         <Input
                                             className="form-input"
-                                            placeholder="ex: Robert Kiyosaki"
+                                            placeholder="пример: Фёдор Достоевский"
                                             {...field}
                                             disabled={isSubmitting}
                                         />
@@ -221,7 +230,7 @@ const UploadForm = () => {
                             name="persona"
                             render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel className="form-label">Choose Assistant Voice</FormLabel>
+                                    <FormLabel className="form-label">Выберите голос ассистента</FormLabel>
                                     <FormControl>
                                         <VoiceSelector
                                             value={field.value}
@@ -236,7 +245,7 @@ const UploadForm = () => {
 
                         {/* 6. Submit Button */}
                         <Button type="submit" className="form-btn" disabled={isSubmitting}>
-                            Begin Synthesis
+                            Начать
                         </Button>
                     </form>
                 </Form>

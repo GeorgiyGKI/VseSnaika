@@ -14,19 +14,25 @@ const Search = () => {
 
     useEffect(() => {
         const delayDebounceFn = setTimeout(() => {
-            const params = new URLSearchParams(window.location.search);
+            const params = new URLSearchParams(searchParams.toString());
+            const normalizedQuery = query.trim();
 
-            if (query) {
-                params.set('query', query);
+            if (normalizedQuery) {
+                params.set('query', normalizedQuery);
             } else {
                 params.delete('query');
             }
 
-            router.push(`${pathname}?${params.toString()}`, { scroll: false });
+            const nextUrl = params.toString() ? `${pathname}?${params.toString()}` : pathname;
+            const currentUrl = searchParams.toString() ? `${pathname}?${searchParams.toString()}` : pathname;
+
+            if (nextUrl !== currentUrl) {
+                router.replace(nextUrl, { scroll: false });
+            }
         }, 300);
 
         return () => clearTimeout(delayDebounceFn);
-    }, [query, pathname, router]);
+    }, [query, pathname, router, searchParams]);
 
     return (
         <div className="library-search-wrapper">

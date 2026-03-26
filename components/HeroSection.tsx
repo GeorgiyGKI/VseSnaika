@@ -12,13 +12,15 @@ const HeroSection = () => {
                             Превратите книги в интерактивные разговоры с ИИ. Слушайте,
                             учитесь и обсуждайте любимые истории.
                         </p>
-                        <button
-                            className="library-cta-primary border border-[var(--border-subtle)] shadow-soft-sm"
-                            type="button"
-                        >
-                            <span className="text-xl leading-none">+</span>
-                            <span>Добавить новую книгу</span>
-                        </button>
+                        <a href="/books/new">
+                            <button
+                                className="library-cta-primary border border-[var(--border-subtle)] shadow-soft-sm"
+                                type="button"
+                            >
+                                <span className="text-xl leading-none">+</span>
+                                <span>Добавить новую книгу</span>
+                            </button>
+                        </a>
                     </div>
 
                     <div className="library-hero-illustration-desktop">
