@@ -26,7 +26,6 @@ export function useLatestRef<T>(value: T) {
 const VAPI_API_KEY = process.env.NEXT_PUBLIC_VAPI_API_KEY;
 const TIMER_INTERVAL_MS = 1000;
 const SECONDS_PER_MINUTE = 60;
-const TIME_WARNING_THRESHOLD = 60; // Show warning when this many seconds remain
 
 let vapi: InstanceType<typeof Vapi>;
 function getVapi() {
@@ -49,6 +48,9 @@ export function useVapi(book: IBook) {
     const [messages, setMessages] = useState<Messages[]>([]);
     const [currentMessage, setCurrentMessage] = useState('');
     const [currentUserMessage, setCurrentUserMessage] = useState('');
+    const [textMessages, setTextMessages] = useState<Messages[]>([]);
+    const [textCurrentMessage, setTextCurrentMessage] = useState('');
+    const [isTextSending, setIsTextSending] = useState(false);
     const [duration, setDuration] = useState(0);
     const [limitError, setLimitError] = useState<string | null>(null);
     const [isBillingError, setIsBillingError] = useState(false);
@@ -56,6 +58,7 @@ export function useVapi(book: IBook) {
     const timerRef = useRef<NodeJS.Timeout | null>(null);
     const startTimeRef = useRef<number | null>(null);
     const sessionIdRef = useRef<string | null>(null);
+    const textSessionIdRef = useRef<string | null>(null);
     const isStoppingRef = useRef(false);
 
     // Keep refs in sync with latest values for use in callbacks
@@ -63,6 +66,19 @@ export function useVapi(book: IBook) {
     const maxDurationRef = useLatestRef(maxDurationSeconds);
     const durationRef = useLatestRef(duration);
     const voice = book.persona || DEFAULT_VOICE;
+
+    useEffect(() => {
+        setTextMessages([]);
+        setTextCurrentMessage('');
+        setIsTextSending(false);
+        textSessionIdRef.current = null;
+    }, [book._id]);
+
+    const endTrackedVoiceSession = useCallback((sessionId: string) => {
+        endVoiceSession(sessionId, durationRef.current).catch((err) =>
+            console.error('Failed to end voice session:', err),
+        );
+    }, [durationRef]);
 
     // Set up Vapi event listeners
     useEffect(() => {
@@ -108,9 +124,7 @@ export function useVapi(book: IBook) {
 
                 // End session tracking
                 if (sessionIdRef.current) {
-                    endVoiceSession(sessionIdRef.current, durationRef.current).catch((err) =>
-                        console.error('Failed to end voice session:', err),
-                    );
+                    endTrackedVoiceSession(sessionIdRef.current);
                     sessionIdRef.current = null;
                 }
 
@@ -186,9 +200,7 @@ export function useVapi(book: IBook) {
 
                 // End session tracking on error
                 if (sessionIdRef.current) {
-                    endVoiceSession(sessionIdRef.current, durationRef.current).catch((err) =>
-                        console.error('Failed to end voice session on error:', err),
-                    );
+                    endTrackedVoiceSession(sessionIdRef.current);
                     sessionIdRef.current = null;
                 }
 
@@ -215,9 +227,7 @@ export function useVapi(book: IBook) {
             // End active session on unmount
             if (sessionIdRef.current) {
                 getVapi().stop();
-                endVoiceSession(sessionIdRef.current, durationRef.current).catch((err) =>
-                    console.error('Failed to end voice session on unmount:', err),
-                );
+                endTrackedVoiceSession(sessionIdRef.current);
                 sessionIdRef.current = null;
             }
             // Cleanup handlers
@@ -226,7 +236,7 @@ export function useVapi(book: IBook) {
             });
             if (timerRef.current) clearInterval(timerRef.current);
         };
-    }, []);
+    }, [endTrackedVoiceSession, maxDurationRef]);
 
     const start = useCallback(async () => {
         if (!userId) {
@@ -257,7 +267,7 @@ export function useVapi(book: IBook) {
             // Note: Server-returned maxDurationMinutes is informational only
             // The actual limit is enforced by useLatestRef(limits.maxSessionMinutes * 60)
 
-            const firstMessage = `Hey, good to meet you. Quick question before we dive in - have you actually read ${book.title} yet, or are we starting fresh?`;
+            const firstMessage = `Привет! Рад встрече. Перед тем как мы начнем — ты уже читал ${book.title}, или мы начинаем с чистого листа?`;
 
             await getVapi().start(ASSISTANT_ID, {
                 firstMessage,
@@ -288,6 +298,50 @@ export function useVapi(book: IBook) {
         getVapi().stop();
     }, []);
 
+    const sendText = useCallback(async (message: string) => {
+        const trimmedMessage = message.trim();
+        if (!trimmedMessage || isTextSending) return;
+
+        setTextMessages((prev) => [...prev, { role: 'user', content: trimmedMessage }]);
+        setTextCurrentMessage('Ищу ответ...');
+        setIsTextSending(true);
+
+        try {
+            const response = await fetch('/api/book-chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    bookId: book._id,
+                    message: trimmedMessage,
+                    sessionId: textSessionIdRef.current,
+                }),
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data?.error || 'Не удалось отправить текстовое сообщение');
+            }
+
+            textSessionIdRef.current = data.sessionId ?? textSessionIdRef.current;
+            setTextCurrentMessage('');
+            setTextMessages((prev) => [
+                ...prev,
+                { role: 'assistant', content: data.reply || 'Не удалось получить ответ.' },
+            ]);
+        } catch (error) {
+            console.error('Failed to send text message:', error);
+            setTextCurrentMessage('');
+            setLimitError(
+                error instanceof Error && error.message
+                    ? error.message
+                    : 'Не удалось получить ответ. Попробуйте еще раз.',
+            );
+        } finally {
+            setIsTextSending(false);
+        }
+    }, [book._id, isTextSending]);
+
     const clearError = useCallback(() => {
         setLimitError(null);
         setIsBillingError(false);
@@ -311,9 +365,13 @@ export function useVapi(book: IBook) {
         messages,
         currentMessage,
         currentUserMessage,
+        textMessages,
+        textCurrentMessage,
+        isTextSending,
         duration,
         start,
         stop,
+        sendText,
         limitError,
         isBillingError,
         maxDurationSeconds,
