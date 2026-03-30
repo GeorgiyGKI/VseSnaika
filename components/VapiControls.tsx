@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { Mic, MicOff } from 'lucide-react';
 import { toast } from 'sonner';
+import { useAuth, useClerk } from '@clerk/nextjs';
 
 import useVapi from '@/hooks/useVapi';
 import Transcript from '@/components/Transcript';
@@ -35,9 +36,20 @@ const VapiControls = ({ book }: { book: IBook }) => {
     } = useVapi(book);
 
     const router = useRouter();
+    const { userId } = useAuth();
+    const { openSignIn } = useClerk();
 
     const [mode, setMode] = useState<InteractionMode>('voice');
     const [textQuery, setTextQuery] = useState('');
+
+    const promptLogin = () => {
+        toast.error('Чтобы общаться с книгой, сначала авторизуйтесь через кнопку Логин.', {
+            action: {
+                label: 'Логин',
+                onClick: () => openSignIn(),
+            },
+        });
+    };
 
     useEffect(() => {
         if (limitError) {
@@ -89,6 +101,11 @@ const VapiControls = ({ book }: { book: IBook }) => {
     const handleTextSubmit = async (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault();
 
+        if (!userId) {
+            promptLogin();
+            return;
+        }
+
         const message = textQuery.trim();
         if (!message || isTextSending) return;
 
@@ -119,7 +136,19 @@ const VapiControls = ({ book }: { book: IBook }) => {
                                 <div className="absolute inset-0 rounded-full bg-white animate-ping opacity-75" />
                             )}
                             <button
-                                onClick={isActive ? stop : start}
+                                onClick={() => {
+                                    if (isActive) {
+                                        stop();
+                                        return;
+                                    }
+
+                                    if (!userId) {
+                                        promptLogin();
+                                        return;
+                                    }
+
+                                    start();
+                                }}
                                 disabled={status === 'connecting'}
                                 className={`vapi-mic-btn shadow-md !w-[60px] !h-[60px] z-10 ${isActive ? 'vapi-mic-btn-active' : 'vapi-mic-btn-inactive'}`}
                             >
